@@ -1,0 +1,114 @@
+
+
+centos软件版本锁定插件:
+ [root@vm2 ~]# yum search versionlock
+ 已加载插件：fastestmirror, versionlock
+ Loading mirror speeds from cached hostfile
+  * base: mirrors.163.com
+  * centosplus: mirrors.cqu.edu.cn
+  * extras: mirrors.163.com
+  * updates: mirrors.cqu.edu.cn
+ ========================================================================================= N/S matched: versionlock =========================================================================================
+ yum-plugin-versionlock.noarch : Yum plugin to lock specified packages from being updated
+ 
+ yum versionlock <包名>
+ yum versionlock list
+ yum versionlock delete '列名'
+ yum versionlock clear
+
+
+-----------------------------------------------------------------
+
+Docker私有仓库Registry的建立:
+1、
+docker run -d -p 5000:5000 -v /data/registry:/var/lib/registry --name registry --restart=always registry
+2、
+修改/etc/docker/daemon.json文件:
+#vi /etc/docker/daemon.json
+{
+    "insecure-registries": ["<ip>:5000"] 
+}
+#systemctl daemon-reload 
+#systemctl restart docker
+注：<ip>：Registry的机器ip地址，在安装registry的节点和客户端需要访问私有Registry的节点都需要执行此步操作。
+3、通过 docker tag重命名镜像，使之与registry匹配:
+docker tag inits/nginx1.8 <ip>:5000/nginx1.8:latest
+4、上传镜像到Registry:
+docker push <ip>:5000/nginx1.8:latest
+5、查看Registry中所有镜像信息:
+curl http://<ip>:5000/v2/_catalog
+6、其他Docker服务器下载镜像:
+docker pull <ip>:5000/nginx1.8:latest
+7、启动镜像:
+docker run -it <ip>:5000/nginx1.8:latest /bin/bash
+
+
+
+
+docker run -d --rm --name resin -v /data:/app/resin/webapps/ROOT -p 8888:8080 resin:r1
+
+yum -y history undo `yum history list gcc* |awk -F\| '{print $1}' |sed -n '4p'`
+
+
+----------------------------------------------------------------------------------------------------------------------------------------
+
+手动创建集群:
+192.168.1.211:6380> CLUSTER MEET 192.168.1.212 6380
+192.168.1.211:6380> CLUSTER MEET 192.168.1.214 6380
+192.168.1.211:6380> CLUSTER MEET 192.168.1.213 6380
+192.168.1.211:6380> CLUSTER MEET 192.168.1.215 6380
+192.168.1.211:6380> CLUSTER MEET 192.168.1.216 6380
+
+redis-cli -h 192.168.1.211 -p 6380 cluster addslots {0..5461}
+redis-cli -h 192.168.1.212 -p 6380 cluster addslots {5462..10922}
+redis-cli -h 192.168.1.214 -p 6380 cluster addslots {10923..16383}
+
+192.168.1.215:6380> cluster replicate c243884f83469b1c384a08b0261f0d068a90d43f
+192.168.1.213:6380> cluster replicate 3802c8b8d6fded3152c3becde98319dd5eae67f0
+192.168.1.216:6380> cluster replicate 3604a0fa6d6deb248a3932a0c379578d1cfe8d1b
+
+redis-trib.rb create --replicas 1 192.168.1.211:6380 192.168.1.212:6380 192.168.1.213:6380 192.168.1.214:6380 192.168.1.215:6380 192.168.1.216:6380
+
+----------------------------------------------------------------------------------------------------------------------------------------
+
+
+docker network create -d macvlan --subnet 192.168.1.0/24 --gateway 192.168.1.1 --attachable -o parent=enp0s3 mynetwork1
+
+docker run -d --rm --name redis1 --network mynetwork1 --ip 192.168.1.211 myredis
+docker run -d --rm --name redis2 --network mynetwork1 --ip 192.168.1.212 myredis
+docker run -d --rm --name redis3 --network mynetwork1 --ip 192.168.1.213 myredis
+
+docker run -d --rm --name redis1 --network mynetwork1 --ip 192.168.1.214 myredis
+docker run -d --rm --name redis2 --network mynetwork1 --ip 192.168.1.215 myredis
+docker run -d --rm --name redis3 --network mynetwork1 --ip 192.168.1.216 myredis
+
+swarm模式:
+docker service create -d --name activemq -e 'ACTIVEMQ_CONFIG_MINMEMORY=2048' -e  'ACTIVEMQ_CONFIG_MAXMEMORY=2048' -e 'ACTIVEMQ_CONFIG_SCHEDULERENABLED=true' --replicas 3 --mount type=bind,src=/data/activemq,dst=/data --mount type=bind,src=/var/log/activemq,dst=/var/log/activemq -p 8161:8161 -p 61616:61616 -p 61613:61613 webcenter/activemq:5.14.3
+
+docker build -t centos_custom:1.0 .
+docker network create -d macvlan --subnet 192.168.0.0/24 --gateway 192.168.0.1 -o parent=enp3s0 docker-net
+docker network create --subnet 192.168.1.0/24 --gateway 192.168.1.1 --attachable -d macvlan -o parent=enp0s3 docker-net1
+ifconfig enp3s0 promisc
+
+docker run -d --ip 192.168.1.5 --network docker-net1 --name docker1 --privileged -v /sys/fs/cgroup:/sys/fs/cgroup:ro custom:1.0 /usr/sbin/init
+
+
+
+dockerfile:
+FROM    centos
+MAINTAINER      chesley1979 "12345678@qq.com"
+  
+RUN set -ex; \
+	/bin/echo 'root:88888888' |chpasswd; \
+	/bin/echo -e "LANG=\"en_US.UTF-8\"" >/etc/default/local; \
+	yum install -y openssh-server net-tools; \
+	ssh-keygen -q -t rsa -b 2048 -f /etc/ssh/ssh_host_rsa_key -N ''; \
+	ssh-keygen -q -t ecdsa -f /etc/ssh/ssh_host_ecdsa_key -N ''; \
+	ssh-keygen -t dsa -f /etc/ssh/ssh_host_ed25519_key  -N '' 
+ENTRYPOINT ["/usr/sbin/sshd","-D"]
+
+EXPOSE  22
+
+
+
+
